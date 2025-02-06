@@ -1,19 +1,21 @@
-#standardizing the second adminstrative structure "Zone" names
+rm(list=ls())
+#standardizing the second administrative structure "Zone" names
+#I will start by reading the files i need
+#reading the region reconciled hmis data
+mal_2017_2024 <- readRDS("data/processed/region_reconciled.rds")
 
-#creating a data frame of unique zones from the reference dataset
-#zone_names <- data.frame(zones= unique(dat_1082$zone))
+#reading the Ethiopia's shape file
+dat_1082 <- read_csv("data/processed/eth_sf_updated.csv") %>%
+  select(id_1082, region, zone, woreda, pop_2022=T_TL) %>%
+  mutate(zone= str_to_title(zone))
 
-#cleaning the zonal names in the HMIS dataset
-unique(mal_2017_2024$zone)
-
+#checking the unique zones number before starting standardization
+sort(unique(mal_2017_2024$zone)) #358
 
 #Removing words and spaces that cause inconsistencies from the zonal name
-mal_2017_2024$zone <- trimws(as.character(mal_2017_2024$zone))
-
 mal_2017_2024 <- mal_2017_2024 %>%
   mutate(zone = gsub(" Zone", "", zone)) %>%
   mutate(zone =gsub(" Woreda", "", zone)) %>%
-  mutate(zone = str_trim(zone, side = "both")) %>%
   mutate(zone = gsub(" Sub City", "", zone)) %>%
   mutate(zone = gsub(" Subcity", "", zone)) %>%
   mutate(zone = gsub(" Town", "", zone)) %>%
@@ -26,86 +28,58 @@ mal_2017_2024 <- mal_2017_2024 %>%
   mutate(zone= gsub(" Zonal Health Department", "", zone)) %>%
   mutate(zone= gsub(" Administration Ho", "", zone))%>%
   mutate(zone= gsub(" City Administration", "", zone)) %>%
-  mutate(zone= gsub(" CITY Health Office", "", zone)) 
+  mutate(zone= gsub(" CITY Health Office", "", zone)) %>%
+  mutate(zone= gsub("  ", " ", zone)) %>%
+  mutate(zone = str_trim(zone, side = "both")) %>%
+ # mutate(zone = case_when(woreda %in% c("Akaki Kality","Nifas Silk Lafto","Kolfe Keraniyo",
+     #                                   "Bole","Lideta","Kirkos","Yeka","Addis Ketema",
+        #                                "Arada","Gulele","Lemi Kura") ~ paste0(woreda," Sub City"),
+          #                TRUE ~ zone))
 
+#checking the unique zone names after performing the above initial phase zone standardization
+sort(unique(mal_2017_2024$zone)) #221
 
+#checking for inconsistency in zone names between the sf and HMIS data
+data.frame(zones= unique(mal_2017_2024$zone)) %>%
+  filter(!zones %in% dat_1082$zone) %>%
+  arrange(zones) #at this stage it shows that there are 168 zone names in HMIS but in the SF
 
-#standardizing similar names with different spellings
+#standardizing the zone names in the HMIS to that of the sf
 mal_2017_2024 <- mal_2017_2024 %>%
-  mutate(zone = case_when(
-    zone == "Alert General Hospital" ~ "Alert Specialized Hospital",
-    zone == "Dagmawi Menilik Referral Hospital" ~ "Dagmawi Minilik Comprehensive Specialized Hospital",
-    zone == "Yekatit 12 General Hospital Medical College" ~ "Yekatit 12 Medical College General Hospital",
-    zone == "Ras Desta Damitew General Hospital" ~ "Ras Desta Damtew Memoreal General Hospital",
-    zone == "St Paulo's Comprehensive Specialized Hospital" ~ "St. Paul Specialized Referral Hospital",  
-    zone == "Shebelle" ~ "Shabelle",
-    zone == "Korahay" ~ "Korahe",
-    zone == "Kaffa" ~ "Kefa",
-    zone == "Kolfe" ~ "Kolfe Keraniyo",
-    zone == "Dawro" ~ "Dawuro",
-    zone == "Nuer" ~ "Nuwer",
-    zone == "Waghimera" ~ "Wag Hamra",
-    zone == "Goffa" ~ "Gofa",
-    zone == "Mohammed Akle Memorandom General Hospital" ~ "Mohammed Akle Memorial Hospital", 
-    zone == "Silte" ~ "Siltie",
-    zone == "Erar" ~ "Erer",
-    zone == "Liben" ~ "Liban",
-    zone == "Dawa" ~ "Daawa",
-    zone == "Sitti" ~ "Siti",
-    zone == "Asosa" ~ "Assosa",
-    zone == "Dollo" ~ "Doolo",
-    zone == "Ale" ~ "Alle",
-    zone == "Gilgelbeles" ~ "Gilgel Beles",
-    zone == "North Wollo" ~ "North Wello",
-    zone == "Wolaita" ~ "Wolayita",
-    zone == "Dalifage Primary Hospital" ~ "Dalifaghe Primary Hospital",
-    zone== "St. Peter General Hospital" ~ "St. Peter Tb Specialized Hospital",
-    zone== "Berahlae Primary Hospital" ~ "Berhale Primary Hospital",
-    zone== "Assayita Primary Hospital"  ~"Ayssaita General Hospital",
-    zone== "Haramaya University Hiwot Fana  Comprehensive Specialized Hospital" ~ "Haramaya University Hiwot Fana Comprehensive Specialized Hospital",
-    zone== "West Gojjam" ~ "West Gojam",
-    zone== "East Gojjam" ~ "East Gojam",
-    zone== "Horo Guduru Wollega" ~ "Horo Gudru Wellega",
-    zone== "West Wollega" ~ "West Wellega",
-    zone== "Tikur Anbessa Specialized Hospital" ~ "Tikur Anbessa Comprehensive Specialized Hospital",
-    zone== "St Paulo's  Comprehensive Specialized Hospital" ~ "St. Paul Specialized Referral Hospital",
-    zone== "Alert General  Hospital" ~ "Alert Specialized Hospital",
-    TRUE ~ zone))
-
-unique(mal_2017_2024$zone)
-
-
-mal_2017_2024 <- mal_2017_2024 %>%
-  mutate (zone = case_when(zone %in% c("Northern Sidama", "Central Sidama", "Southern  Sidama", "Hawassa", "Eastern Sidama", "Hawassa Comprehensives Specialized Hospital") ~ "Sidama",
+  mutate(zone= gsub("Gojjam", "Gojam", zone),
+         zone= gsub("Wollega", "Wellega", zone),
+         zone= gsub("Wollo", "Wello", zone)) %>%
+  mutate (zone = case_when(zone %in% c("Northern Sidama", "Central Sidama","Southern Sidama", "Hawassa", "Eastern Sidama", "Hawassa Comprehensives Specialized Hospital") ~ "Sidama",
                            zone== "Kembata" ~ "Kembata Tembaro", 
                            zone %in% c("Melkajebdu", "Biyoawale", "Jeldessa") ~ "Dire Dawa Rural",
                            zone %in% c("East Gurage","Kebena Special", "Mareko Special", "Gurage") ~ "Guraghe",
                            zone== "Koore" ~ "Amaro",
-                           zone %in% c("Zone 1", "Ayssaita General Hospital", "Abala Primary Hospital", "Dubti Referral Hospital", "Chifra Primary Hospital", "Logia Primary Hospital", "Dubti General Hospital") ~ "Awsi /Zone 1",
-                           zone %in% c("Dalifaghe Primary Hospital", "Gende Kore", "Gendekore", "Sabiyan General Hospital", "Legehare", "Dire Dawa", "Dilchora  General Hospital") ~ "Dire Dawa Urban",
+                           zone %in% c("Zone 1", "Assayita Primary Hospital","Ayssaita General Hospital", "Abala Primary Hospital", "Dubti Referral Hospital", "Chifra Primary Hospital", "Logia Primary Hospital", "Dubti General Hospital") ~ "Awsi /Zone 1",
+                           zone %in% c("Dalifage Primary Hospital","Dalifaghe Primary Hospital", "Gende Kore", "Gendekore", "Sabiyan General Hospital", "Legehare", "Dire Dawa", "Dilchora General Hospital") ~ "Dire Dawa Urban",
                            zone== "West Omo" ~ "Mirab Omo",
                            zone %in% c("Asalla", "Asela") ~ "Arsi", 
-                           zone %in% c("Bahirdar", "North Gojjam") ~ "West Gojam",
-                           zone %in% c("Hakim", "Sofi", "Amir Nur", "Shenkor", "Jugel General Hospital", "Haramaya University Hiwot Fana Comprehensive Specialized Hospital", "Aboker", "Abadir", "Harar General Hospital", "Harar Police Primary Hospital", "Yemaj General Hospital") ~ "Harari",
-                           zone %in% c("Debere Birhan", "Debrebirhan") ~ "North Shewa (AM)",
+                           zone %in% c("Bahirdar", "North Gojam") ~ "West Gojam",
+                           zone %in% c("Hakim", "Sofi", "Amir Nur", "Shenkor", "Jugel General Hospital", "Haramaya University Hiwot Fana  Comprehensive Specialized Hospital","Haramaya University Hiwot Fana Comprehensive Specialized Hospital", "Aboker", "Abadir", "Harar General Hospital", "Harar Police Primary Hospital", "Yemaj General Hospital") ~ "Harari",
+                           zone %in% c("Debere Birhan", "Debrebirhan") ~ "North Shewa (Am)",
                            zone== "Jinela" ~ "Harari",
                            zone== "Nekemte" ~ "East Wellega",
                            zone %in% c("Jimma Special", "Agaro") ~ "Jimma",
-                           zone %in% c("Bole", "Akaki Kality", "Nifas Silk Lafto", "Kolfe Keraniyo", "Lideta", "Kirkos",
-                                       "Yeka", "Addis Ketema", "Arada", "Gulele", "Lemi Kura", "Yekatit 12 Medical College General Hospital", "Alert Specialized Hospital", "St. Paul Specialized Referral Hospital","Tikur Anbessa Comprehensive Specialized Hospital", "Tirunesh Beijing Hospital", "Zewditu Memorial General Hospital", "St. Peter Tb Specialized Hospital", "Dagmawi Minilik Comprehensive Specialized Hospital", "Yeka Kotebe General Hospital", "Ras Desta Damtew Memoreal General Hospital", "Gandhi Memorial General Hospital", "Amanuel Referal Hospital") ~ "Region 14",
+                           zone %in% c("Bole", "Akaki Kality", "Nifas Silk Lafto", "Kolfe Keraniyo","Kolfe", "Lideta", "Kirkos",
+                                       "Yeka", "Addis Ketema", "Arada", "Gulele", "Lemi Kura", "Yekatit 12 Medical College General Hospital", "Alert Specialized Hospital","Alert General Hospital", "St Paulo's  Comprehensive Specialized Hospital", "St. Paul Specialized Referral Hospital","Tikur Anbessa Specialized Hospital", "Tikur Anbessa Comprehensive Specialized Hospital", "Tirunesh Beijing Hospital", "Zewditu Memorial General Hospital", "St. Peter General Hospital", "St. Peter Tb Specialized Hospital", "Dagmawi Minilik Comprehensive Specialized Hospital", "Yeka Kotebe General Hospital", "Ras Desta Damtew Memoreal General Hospital", "Gandhi Memorial General Hospital", "Amanuel Referal Hospital", "Dagmawi Menilik Referral Hospital","Yekatit 12 General Hospital Medical College",
+                                       "Ras Desta Damitew General Hospital", "St Paulo's Comprehensive Specialized Hospital") ~ "Region 14",
                            zone== "Ari" ~ "South Omo",
-                           zone %in% c("South Wollo", "Dessie", "Kombolcha") ~ "South Wello",
-                           (zone== "North Shewa" & region== "Amhara") ~ "North Shewa (AM)",
-                           (zone== "North Shewa" & region== "Oromia") ~ "North Shewa (OR)",
+                           zone %in% c("Dessie", "Kombolcha") ~ "South Wello",
+                           (zone== "North Shewa" & region== "Amhara") ~ "North Shewa (Am)",
+                           (zone== "North Shewa" & region== "Oromia") ~ "North Shewa (Or)",
                            zone== "Dire Teyara" ~ "Harari",
                            zone %in% c("Bishoftu","Batu", "Adama Special", "Mojo", "Modjo", "Adama City") ~ "East Shewa",
                            zone %in% c("SHEGER", "Holota", "Sendafa Bake", "Sheger City", "Holeta") ~ "Finfine Special",
                            zone %in% c("Woldia", "Woldiya") ~ "North Wello",
                            zone== "Debretabor" ~ "South Gondar",
-                           zone %in% c("Zone 3", "Gewane Primary Hospital", "Mohammed Akle Memorial Hospital") ~ "Gabi /Zone 3",
+                           zone %in% c("Zone 3", "Gewane Primary Hospital", "Mohammed Akle Memorandom General Hospital", "Mohammed Akle Memorial Hospital") ~ "Gabi /Zone 3",
                            zone== "Oromia Special" ~ "Oromia",
-                           zone %in% c("Zone 2", "Berahlae Primary Hospital", "Berhale Primary Hospital") ~ "Kilbati /Zone 2",
-                           zone %in% c("Zone 4", "Kelewan District  Hospital") ~ "Fanti /Zone 4",
+                           zone %in% c("Zone 2", "Berahlae Primary Hospital", "Berahlae Primary Hospital", "Berhale Primary Hospital") ~ "Kilbati /Zone 2",
+                           zone %in% c("Zone 4", "Kelewan District Hospital") ~ "Fanti /Zone 4",
                            zone== "Tembaro Special" ~"Kembata Tembaro",
                            zone %in% c("East Borena", "Shakiso") ~ "Guji",
                            zone== "Metu" ~ "Ilu Aba Bora",
@@ -120,39 +94,44 @@ mal_2017_2024 <- mal_2017_2024 %>%
                            zone== "Konta" ~ "Konta Special",
                            zone== "Zone 5" ~ "Hari /Zone 5",
                            zone== "Gondar" ~ "Central Gondar",
-                           zone== "Gilgel Beles" ~ "Metekel",
+                           zone %in% c("Gilgel Beles", "Gilgelbeles") ~ "Metekel",
                            zone %in% c("Goro", "Woliso") ~ "South West Shewa",
                            zone %in% c("Ambo", "Ambotown") ~ "West Shewa",
                            zone %in% c("Bule Hora", "Bule Hora Health Department") ~ "West Guji",
                            zone %in% c("Sultan Sheikh Hassan Memorial Referral Hospital", "Jigjiga University Sultan Sheikh Hasan Yabare Comprhensive Specialized Hospital") ~ "Fafan",
-                           zone== "Itang Special" ~ "Itang Special woreda", 
+                           zone== "Itang Special" ~ "Itang Special Woreda", 
                            zone== "Nedjo" ~ "West Wellega",
                            zone== "Robe" ~ "Bale",
-                           zone== "Sheno" ~ "North Shewa (OR)",
+                           zone== "Sheno" ~ "North Shewa (Or)",
                            zone== "Mao Komo" ~ "Mao Komo Special",
+                           zone== "Shebelle" ~ "Shabelle",
+                           zone== "Korahay" ~ "Korahe",
+                           zone == "Kaffa" ~ "Kefa",
+                           zone == "Dawro" ~ "Dawuro",
+                           zone == "Nuer" ~ "Nuwer",
+                           zone == "Waghimera" ~ "Wag Hamra",
+                           zone == "Goffa" ~ "Gofa",
+                           zone == "Silte" ~ "Siltie",
+                           zone == "Erar" ~ "Erer",
+                           zone == "Liben" ~ "Liban",
+                           zone == "Dawa" ~ "Daawa",
+                           zone == "Sitti" ~ "Siti",
+                           zone == "Asosa" ~ "Assosa",
+                           zone == "Dollo" ~ "Doolo",
+                           zone == "Ale" ~ "Alle",
+                           zone == "Wolaita" ~ "Wolayita",
+                           zone== "Horo Guduru Wellega" ~ "Horo Gudru Wellega",
                            TRUE ~ zone))
 
-#creating a data frame of the zones in the 2017 to 2024 HMIS 
-zone_names <- data.frame(zones= unique(mal_2017_2024$zone))                              
-
-#checking for inconsistency in zone names between the sf and HMIS data
-inconsistent_zones <- zone_names %>%
+#rechecking the zones names that are in the HMIS but in the sf after performing the
+#above step to standardize the names (inconsistent zone names)
+data.frame(zones= unique(mal_2017_2024$zone)) %>%
   filter(!zones %in% dat_1082$zone) %>%
-  arrange(zones)
+  arrange(zones) #now all the zone names in the HMIS are consistent with the sf 
 
 
-#removing unncessary dataframes
-rm(inconsistent_region)
-rm(inconsistent_zones)
+#saving the HMIS dataset with reconciled zone names
+saveRDS(mal_2017_2024, file = "data/processed/HMIS_zones_reconciled.rds")
 
+#---------------------------------END--------------------------------------
 
-
-print(mal_2017_2024, max=Inf)
-unique(mal_2017_2024$zone)
-unique(dat_1082$zone)
-
-#saving the region and zone level cleaned 2017-2024 dataset
-saveRDS(mal_2017_2024, file = "C:/Users/edemssie/OneDrive - PATH/Desktop/R projects/data cleaning practice/data/processed/mal_17_24_cleaned.rds")
-
-#saving the csv form
-write.csv(mal_2017_2024, "C:/Users/edemssie/OneDrive - PATH/Desktop/R projects/data cleaning practice/data/processed/mal_17_24_cleaned.csv", row.names = FALSE)
