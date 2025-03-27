@@ -112,7 +112,8 @@ table(my_hmis$mal_type, useNA = "always")
 
 #grouping the hmis and forming aggregation for the value before saving
 my_hmis_out <- my_hmis |>
-  group_by(id_1082, region, zone, woreda, facility, period_start_date, year, data_type) |>
+  group_by(id_1082, region, zone, woreda, facility, period_start_date, 
+           year, data_type, mal_type) |>
   summarise(agg_value= sum(value, na.rm= T), .groups = "drop") 
 
 #save this version of the cleaned hmis
