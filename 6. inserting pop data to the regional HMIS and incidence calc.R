@@ -11,6 +11,10 @@ my_hmis <- readRDS("data/processed/hmis_data_type_assigned.rds")
 #reading population data
 pop_data <- read.csv("data/processed/pop data from UN.csv")
 
+#reading the shape file
+shape_file <- read.csv("data/processed/eth_shape_file_updated.csv")
+
+
 #lets change the pop_data to onger form & standardize the cols
 pop_data_long <- pop_data |>
   pivot_longer(cols = c("X2017","X2018", "X2019", "X2020", "X2021",
@@ -61,5 +65,39 @@ regional_hmis_pop |>
        y= "year")+
   facet_wrap(~region)
   
+#------------------------------------------------------------------------------
+# lets project population number for the years 2017-2024 based on 
+# 2022 pop number given
+shape_file <- shape_file |>
+  mutate(pop_2022_ref = pop_2022) |>
+  mutate(pop_2021= pop_2022*(1.0266^-1)) |>
+  mutate(pop_2020= pop_2022*(1.0266^-2)) |>
+  mutate(pop_2019= pop_2022*(1.0266^-3)) |>
+  mutate(pop_2018= pop_2022*(1.0266^-4)) |>
+  mutate(pop_2017= pop_2022*(1.0266^-5)) |>
+  mutate(pop_2023= pop_2022*(1.0266^1)) |>
+  mutate(pop_2024= pop_2022*(1.0266^2)) |>
+  select(id_1082, region, zone, woreda, pop_2022_ref, pop_2017, pop_2018, pop_2019,
+         pop_2020, pop_2021, pop_2022, pop_2023, pop_2024)
+
+#lets aggregate the pop number at region level
+pop_data_sf <- shape_file |>
+  group_by(region) |>
+  summarise(pop_2017_agg = sum(pop_2017, na.rm = T),
+            pop_2018_agg = sum(pop_2018, na.rm = T),
+            pop_2019_agg = sum(pop_2019, na.rm = T),
+            pop_2020_agg = sum(pop_2020, na.rm = T),
+            pop_2021_agg = sum(pop_2021, na.rm = T),
+            pop_2022_agg = sum(pop_2022, na.rm = T),
+            pop_2023_agg = sum(pop_2023, na.rm = T),
+            pop_2024_agg = sum(pop_2024, na.rm = T), .groups = "drop")
+
+#joining the hmis and sf
+hmis_pop_included <- my_hmis |>
+  left_join(shape_file, by= c("id_1082", "region", "zone", "woreda"))
+
+#lets check to ensure the joining was perfect fit
+hmis_pop_included |>
+  filter(is.na(pop_2017)) 
 
 
