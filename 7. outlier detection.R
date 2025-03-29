@@ -1,4 +1,4 @@
-#on this script I am to perform identification of outliers using box plots,
+#on this script I am to perform identification of out liers using box plots,
 # line graphs and the pull function. I also aim to replace those outliers 
 #that look suspicious with proper values
 
@@ -465,150 +465,38 @@ x <- my_hmis |>
 x= my_hmis |>
   filter(facility == "Kishe Health Center", 
          year == 2024, data_type== "pf_conf") #looks a case up surge- leave it
+
+#National malaria trend (before outliers resolved)
+my_hmis |>
+  filter(data_type == "pf_conf") |>
+  group_by(period_start_date) |>
+  summarise(total_cases = sum(agg_value)) |>
+  ggplot(aes(x= period_start_date, 
+             y= total_cases)) +
+  geom_line(linewidth= 0.8)+
+  labs(title = "National pf_confirmed trend",
+       subtitle = "from 2017 to 2024",
+       x = "Years",
+       y= "total PF malaria cases")
+
+#saving the plot
+ggsave(filename = "outputs/outlier detection/National pf case trend from outlier not dealt.tiff", width = 10,
+       height = 8, compression= "lzw", bg= "white")
+
+#National malaria trend (after outliers resolved)
+hmis_outlier_resolved |>
+  filter(data_type == "pf_conf") |>
+  group_by(period_start_date) |>
+  summarise(total_cases = sum(agg_value)) |>
+  ggplot(aes(x= period_start_date, 
+             y= total_cases)) +
+  geom_line(linewidth= 0.8)+
+  labs(title = "National pf_confirmed trend",
+       subtitle = "from 2017 to 2024",
+       x = "Years",
+       y= "total PF malaria cases")
+
+#saving the plot
+ggsave(filename = "outputs/outlier detection/National pf case trend from outlier resolved.tiff", width = 10,
+       height = 8, compression= "lzw", bg= "white")
 ----------------------------------------------------------------------------
-
-#below is another way of identifying outliers
-#lets see the summary of the aggregated value so that I can identify those
-#with higher values
-my_hmis |>
-  filter(data_type=="pf_conf") |>
-  pull(agg_value) |>
-  summary() #i see the max value is 6172
-
-x <-my_hmis |>
-  filter(agg_value== 6172, data_type== "pf_conf") #Gunfi Health Center in
-#Begi woreda, west wellega
-
-#lets make time series for that specific health center
-my_hmis |>
-  filter(facility== "Gunfi Health Center", data_type=="pf_conf") |>
-  ggplot(aes(x= period_start_date, y= agg_value)) +
-  geom_line(linewidth=1) #it shows a sudden spike and drop w/h is suspecios
-
-#lets extract the mean for the values other than the outliers to replace
-#the outliers with this mean value
-my_hmis |>
-  filter(facility== "Gunfi Health Center" & 
-           woreda== "Begi" & 
-           agg_value < 6172 &
-           data_type== "pf_conf") |>
-  group_by(period_start_date, agg_value, data_type)|>
-  summarise(mean_val= mean(agg_value), .groups = "drop")|> #317
-  mutate(agg_value= case_when(agg_value >= 6172 ~ 317,
-                              TRUE ~ agg_value)) |>
-  ggplot(aes(x= period_start_date, y= agg_value)) +
-  geom_line(linewidth=1)
-
-#lets cntinue the same process for the other hfs
-my_hmis |>
-  filter(data_type == "pf_conf")|>
-  pull(agg_value)|>
-  summary()
-
-
-#lets create a vector for checked hfs 
-hf_checked <- c("Gunfi Health Center")
-
-my_hmis |>
-  filter(data_type=="pf_conf", !facility %in% hf_checked ) |>
-  pull(agg_value) |>
-  summary() #max val= 5876
-
-
-x <-my_hmis |>
-  filter(agg_value== 5876, data_type== "pf_conf") # Amballo Dila Health Center
-
-my_hmis |>
-  filter(facility== "Amballo Dila Health Center", data_type=="pf_conf") |>
-  ggplot(aes(x= period_start_date, y= agg_value)) +
-  geom_line()
-
-#update the hf_checked vector by adding Amballo HC
-hf_checked <- c("Gunfi Health Center", "Amballo Dila Health Center")
-
-my_hmis |>
-  filter(data_type=="pf_conf", !facility%in% hf_checked) |>
-  pull(agg_value) |>
-  summary() #4950
-
-x <-my_hmis |>
-  filter(agg_value== 4590, data_type== "pf_conf") #Genji Health Center
-
-#update the hf_checked vector by adding Genji HC 
-hf_checked <- c("Gunfi Health Center", "Amballo Dila Health Center",
-"Genji Health Center")
-
-my_hmis |>
-  filter(facility== "Genji Health Center", data_type=="pf_conf") |>
-  ggplot(aes(x= period_start_date, y= agg_value)) +
-  geom_line()
-
-#lets do the detection for large regions
-my_hmis |>
-  filter(region %in% large_regions, data_type== "pf_conf") |>
-  group_by(region, zone, woreda, period_start_date) |>
-  summarise(total_cases= sum(agg_value, na.rm = T), .groups = "drop")|>
-  ggplot(aes(x= zone,
-             y= total_cases))+
-  facet_wrap(~region, scales = "free")+
-  geom_boxplot(fill= "green", outlier.size = 1, outlier.color = "red")+
-  theme(panel.grid.major= element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_blank())+
-  coord_flip()
-
-#select zones from large regions for further check
-large_zones_to_investigate <- c("South Gondar", "West Gondar",
-                                "Central Gondar", "Buno Bedele", 
-                                "Ilu Aba Bora", "West Wellega")
-
-my_hmis |>
-  filter(zone %in% large_zones_to_investigate, data_type== "pf_conf") |>
-  group_by(zone, woreda, period_start_date) |>
-  summarise(total_cases= sum(agg_value, na.rm = T), .groups = "drop")|>
-  ggplot(aes(x= woreda,
-             y= total_cases))+
-  facet_wrap(~zone, scales = "free")+
-  geom_boxplot(fill= "green", outlier.size = 0.7, outlier.color = "red")+
-  theme(panel.grid.major= element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_blank())+
-  coord_flip()
-
-#select woredas from large regions for further check
-large_wor_furher <- c("Chwaka","Darimu", "Nejo", "Babo", "Dera (Am)",
-                      "East Dembia", "Quara")
-
-#constructing a time series for the woredas selected for further investigation
-my_hmis |>
-  filter(woreda %in% large_wor_furher, data_type== "pf_conf") |>
-  group_by(woreda, period_start_date) |>
-  summarise(total_cases= sum(agg_value, na.rm = T), .groups = "drop")|>
-  ggplot(aes(x= period_start_date,
-             y= total_cases,
-             group = woreda))+
-  facet_wrap(~woreda, scales = "free", ncol=1)+
-  geom_line(linewidth= 0.5)+  #group= woreda rather than facility
-  theme_minimal()+
-  labs(x= "Period",
-       y= "Total cases")
-
-
-
-
-ggsave(filename = "outputs/time series for selected woredas.tiff", 
-       width = 10, height = 8, compression = "lzw", bg="white")
-
-#facility level plot from selected woredas
-my_hmis|>
-  filter(woreda %in% large_wor_furher, data_type== "pf_conf") |>
-  group_by(woreda, facility, period_start_date) |>
-  summarise(total_cases= sum(agg_value, na.rm = T), .groups = "drop") |>
-  ggplot(aes(x= period_start_date,
-             y= total_cases,
-             group = woreda))+
-  geom_line(linewidth= 0.5)
-  facet_wrap(~ woreda, ncol=1)+
-  theme_minimal()
