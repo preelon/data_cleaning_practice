@@ -8,11 +8,23 @@ rm(list = ls())
 library("tidyverse")
 library("lubridate")
 library(RColorBrewer)
+library("ggplot2")
 
 mycols = c(brewer.pal(11, "Spectral"))
 
 #read the hmis data to work on
-my_hmis <- readRDS("data/processed/hmis_data_type_assigned.rds")
+my_hmis <- readRDS("data/processed/Cleaned HMIS with reg pop.rds")
+
+#example of multiple line graphs to show time series (one on one meeting)
+my_hmis |>
+  filter(data_type== "pf_conf", region== "Addis Ababa") |>
+  group_by(region, zone, woreda, id_1082, period_start_date)|>
+  summarise(total_cases= sum(agg_value, na.rm = T), .groups = "drop")|>
+  ggplot(aes(x= period_start_date, y= total_cases, color= woreda)) +
+  geom_line()+
+  facet_wrap(vars(region), scale= "free_y")+
+  theme(legend.position = "none")
+#------------------------------------------------------------------------
 
 #lets create vectors that specify large and small regions- will help to
 #separately construct box plot for the large & small regions
@@ -43,7 +55,6 @@ my_hmis |>
   filter(data_type== "pf_conf", region %in% small_regions) |>
   group_by(year, region) %>%
   summarise(total_cases= sum(agg_value, na.rm = T), .groups = "drop") |>
-  #Boxplot
   ggplot(aes(x = region, y = total_cases)) +
   geom_boxplot(fill="skyblue", outlier.colour = "red") +
   labs(title = "malaria distribtion by region",
@@ -95,9 +106,9 @@ my_hmis |>
   ggplot(aes(x= woreda, y= total_cases))+
   geom_boxplot(fill= "skyblue" ,outlier.colour = "red")+
   coord_flip()+
-  labs(title = "pf cases at woreda level",
+  labs(title = "Distribution of PF in districts from selected Zones",
        subtitle = "from selected zones with outliers",
-       x= "woreda", 
+       x= "District name", 
        y= "Total cases")+
   facet_wrap(~zone, scale= "free")+
   theme_minimal()
@@ -176,7 +187,7 @@ woreda_outliers <- c("Bilate Zuria", "Raso", "Shay Bench", "Dechatu",
                      "Abergele (Am)", "Shebe Sambo", "Sekoru",
                      "Nejo", "Babo")
 
-# time series analysis for the selected districts 
+# time series analysis for selected districts 
 my_hmis |>
   filter(woreda %in% woreda_outliers, data_type== "pf_conf")|>
   group_by(woreda, period_start_date) |>
@@ -185,6 +196,8 @@ my_hmis |>
              y= total_cases,
              group = woreda))+
   geom_line(linewidth = 0.6)+
+  labs(title = "Time Series Analysis of PF Cases by Region Over the Years",
+       subtitle = "2017-2024", x= "Year", y= "Total Cases")+
   facet_wrap(~woreda, scale= "free")+
   theme_minimal()
 
@@ -499,4 +512,4 @@ hmis_outlier_resolved |>
 #saving the plot
 ggsave(filename = "outputs/outlier detection/National pf case trend from outlier resolved.tiff", width = 10,
        height = 8, compression= "lzw", bg= "white")
-----------------------------------------------------------------------------
+#----------------------------------------------------------------------------

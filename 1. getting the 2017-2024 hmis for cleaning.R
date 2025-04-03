@@ -60,7 +60,6 @@ write.csv(mal_23_24_2023, "data/2023_2_temp.csv") #the 2023 value for all region
 #except for south and south west should be taken from the 2023-24 df
 #for south and south west we will take the data fro 2017-2023 df
   
-  
 #based on my observation above, I'll create a 2017-2024 df by taking 2023 value 
 #for the sw and south regions from the 2017-2023 and for the rest of the
 #regions from the 2023-24 df

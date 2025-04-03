@@ -8,80 +8,24 @@ library(ggplot2)
 #reading the hmis file
 my_hmis <- readRDS("data/processed/hmis_data_type_assigned.rds")
 
-#reading population data
-pop_data <- read.csv("data/processed/pop data from UN.csv")
-
 #reading the shape file
 shape_file <- read.csv("data/processed/eth_shape_file_updated.csv")
 
-
-#lets change the pop_data to onger form & standardize the cols
-pop_data_long <- pop_data |>
-  pivot_longer(cols = c("X2017","X2018", "X2019", "X2020", "X2021",
-                        "X2022", "X2023", "X2024"),
-               names_to = "year",
-               values_to = "pop") 
-
-#standardizing the long pop data
-pop_data_long <- pop_data_long |>
-  select(-r) |>
-  mutate(year= gsub("^X", "", year)) |>
-  mutate(year= as.numeric(year)) |>#change into numeric format
-  rename(region= Area) |>
-  mutate(pop= pop*1000)
-  
-
-#create a data frame of onfirmed malaria cases by region and 
-#add population data to it
-unique(my_hmis$data_type)
-
-regional_hmis <- my_hmis |>
-  filter(data_type %in% c("pf_conf", "pv_conf",
-                          "tests", "positives", "mixed", 
-                          "other_conf", "pm_conf",
-                          "po_conf")) |>
-  group_by(region, year, data_type) |>
-  summarise(total_cases= sum(agg_value, na.rm = T), .groups = "drop")
-
-#lets join the regional_hmis with pop_data to get the respective year pop
-regional_hmis_pop <- regional_hmis |>
-  left_join(pop_data_long, by= c("year", "region"))
-
-#lets check if there are unacceptable NA values
-x= regional_hmis_pop |>
-  filter(is.na(pop)) #the new region's pop from 2017-2022 is NA b/c not divided
-                     #before the 2023. also SNNPR in 2023 and 2024
-
-#line graph of confirmed pf cases incidence rate by region
-regional_hmis_pop |>
-  filter(data_type== "pf_conf") |>
-  group_by(year, region, total_cases, pop) |>
-  summarise(incidence_rate= (total_cases/pop)*1000, .groups = "drop") |>
-  ggplot(aes(x= year, y= incidence_rate))+
-  geom_line(linewidth= 1, color= "blue")+
-  theme_classic()+
-  labs(title = "pf_confirmed incidence trend by region",
-       x= "incidence rate",
-       y= "year")+
-  facet_wrap(~region)
-  
-#------------------------------------------------------------------------------
 # lets project population number for the years 2017-2024 based on 
-# 2022 pop number given
+# 2022 pop number in the sf
 shape_file <- shape_file |>
-  mutate(pop_2022_ref = pop_2022) |>
   mutate(pop_2021= pop_2022*(1.0266^-1)) |>
-  mutate(pop_2020= pop_2022*(1.0266^-2)) |>
-  mutate(pop_2019= pop_2022*(1.0266^-3)) |>
-  mutate(pop_2018= pop_2022*(1.0266^-4)) |>
-  mutate(pop_2017= pop_2022*(1.0266^-5)) |>
+  mutate(pop_2020= pop_2021*(1.0266^-1)) |>
+  mutate(pop_2019= pop_2020*(1.0266^-1)) |>
+  mutate(pop_2018= pop_2019*(1.0266^-1)) |>
+  mutate(pop_2017= pop_2018*(1.0266^-1)) |>
   mutate(pop_2023= pop_2022*(1.0266^1)) |>
-  mutate(pop_2024= pop_2022*(1.0266^2)) |>
-  select(id_1082, region, zone, woreda, pop_2022_ref, pop_2017, pop_2018, pop_2019,
+  mutate(pop_2024= pop_2023*(1.0266^1)) |>
+  select(id_1082, region, zone, woreda, pop_2017, pop_2018, pop_2019,
          pop_2020, pop_2021, pop_2022, pop_2023, pop_2024)
 
 #lets aggregate the pop number at region level
-pop_data_sf <- shape_file |>
+pop_data_regional <- shape_file |>
   group_by(region) |>
   summarise(pop_2017_agg = sum(pop_2017, na.rm = T),
             pop_2018_agg = sum(pop_2018, na.rm = T),
@@ -92,12 +36,47 @@ pop_data_sf <- shape_file |>
             pop_2023_agg = sum(pop_2023, na.rm = T),
             pop_2024_agg = sum(pop_2024, na.rm = T), .groups = "drop")
 
+#lets change the pop regional data to longer format
+pop_data_regional_long <- pop_data_regional |>
+  pivot_longer(cols = c("pop_2017_agg", "pop_2018_agg", "pop_2019_agg",
+                        "pop_2020_agg", "pop_2021_agg", "pop_2022_agg",
+                        "pop_2023_agg", "pop_2024_agg"), 
+               names_to = "years", values_to = "population") 
+
+#remove text from the year column in the long data
+pop_data_regional_long <- pop_data_regional_long |>  
+mutate(years= case_when(grepl("2017", years) ~ "2017",
+                        grepl("2018", years) ~ "2018",
+                        grepl("2019", years) ~ "2019",
+                        grepl("2020", years) ~ "2020",
+                        grepl("2021", years) ~ "2021",
+                        grepl("2022", years) ~ "2022",
+                        grepl("2023", years) ~ "2023",
+                        grepl("2024", years) ~ "2024",
+       T ~ years)) |>
+  mutate(years = as.numeric(years))
+
+#lets left join the long regional pop data to the HMIS
+hmis_regional_pop_joined <- my_hmis |>
+  left_join(pop_data_regional_long, by= c("region", "year"= "years"))
+
+#saving the cleaned HMIS with pop data at woreda level
+saveRDS(hmis_regional_pop_joined, "data/processed/Cleaned HMIS with reg pop.rds")
+
+#______________________________END______________________________________
+
+#the velow script in between the broken lines is lefe as there was some issues
+# and replaced with the above regional level pop
+#--------------------------------------------------------------------------
 #joining the hmis and sf
 hmis_pop_included <- my_hmis |>
   left_join(shape_file, by= c("id_1082", "region", "zone", "woreda"))
 
 #lets check to ensure the joining was perfect fit
 hmis_pop_included |>
-  filter(is.na(pop_2017)) 
+  filter(is.na(pop_2017)) #0 unmatched
 
+#saving the cleaned HMIS with pop data at woreda level
+saveRDS(hmis_pop_included, "data/processed/cleaned hmis with pop data.rds")
 
+#----------------------------------END-----------------------------------------

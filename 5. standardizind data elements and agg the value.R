@@ -99,7 +99,7 @@ my_hmis <- my_hmis %>%
 #lets see the frequency table for each data types
 table(my_hmis$data_type, useNA = "always")
 
-#lets further standatdize the data elements by creating a new col to specify
+#lets further standardize the data elements by creating a new col to specify
 #confirmed and presumed cases
 confirmed <- c("pf_conf", "pv_conf", "po_conf", 
                "pm_conf", "other_conf", "mixed")
@@ -108,13 +108,32 @@ my_hmis <- my_hmis %>%
   mutate(mal_type= case_when(data_type %in% confirmed ~ "confirmed",
                              data_type== "clinical" ~ "presumed",
                              T ~ NA))
+
 table(my_hmis$mal_type, useNA = "always")
+
+#assigning facility type to facilities
+my_hmis <- my_hmis %>%
+  mutate(facility_type = case_when(
+    grepl(" Hospital|University Specialized", facility, ignore.case = TRUE) ~ "Hospital",
+    grepl(" Health Center|HC|health centre|health centeer|Health  Center|Health Henter|
+          Health Cente|12health Center| Center" , facility, ignore.case = TRUE) ~ "Health Center",
+    grepl(" Health Post|HP|Health  post|Healrh Post|Helth Post|Heath Post|01Health Post|Heaalth Post|
+    Haelth Post|Lijomy Healh Post|Helath Post|Haelth Post|Heakth Post|Healt Post|
+           Post|H/Post|Healh Post||Health Post| Post|Healthe Post|Health Popst|Health Pos|
+          Helthe Poset|heathe post|Health Pos|Heallth Post|_Health Post|_Health Pos", facility, ignore.case = TRUE) ~ "Health Post",
+    grepl(" Clinic|MediumClinic|Speciality Center|Surgical Center|Speciality|Home Based Service|
+          Medium| M/Clinic|H.clinic|Mediu|Clinc|Mulu Primary|Mch Center", facility, ignore.case = TRUE) ~ "PPM",
+    TRUE ~ "Other"))
+
+table(my_hmis$facility_type, useNA = "always")
+
 
 #grouping the hmis and forming aggregation for the value before saving
 my_hmis_out <- my_hmis |>
   group_by(id_1082, region, zone, woreda, facility, period_start_date, 
-           year, data_type, mal_type) |>
-  summarise(agg_value= sum(value, na.rm= T), .groups = "drop") 
+           year, data_type, mal_type,facility_type, 
+           category_option_combo_name, attribute_option_combo_name) |>
+  summarise(value= sum(value, na.rm= T), .groups = "drop") 
 
 #save this version of the cleaned hmis
 saveRDS(my_hmis_out, "data/processed/hmis_data_type_assigned.rds")
